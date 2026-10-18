@@ -27,12 +27,47 @@ public class MessageProcessor implements Runnable {
 
     @Override
     public void run() {
-        // TODO 4: într-o buclă:
-        //   - preluați un mesaj: inbox.take()
-        //   - salvați mesajul în fișierul CSV: storage.append(kind, mesaj)
-        //     (CsvStorage este gata implementată)
-        //   - actualizați dashboard-ul, în funcție de kind
-        //   - alarmele și confirmările se afișează imediat în consolă
-        //   - un mesaj greșit (format invalid) nu trebuie să oprească thread-ul
+        try {
+            while (true) {
+                String message = inbox.take();
+                storage.append(kind, message);
+
+                try {
+                    process(message);
+                } catch (RuntimeException e) {
+                    System.out.println("[" + kind + "] mesaj invalid ignorat: " + message
+                            + " (" + e.getClass().getSimpleName() + ")");
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    private void process(String message) {
+        String[] parts = message.split(";");
+        String deviceId = parts[0];
+
+        switch (kind) {
+            case "telemetry": {
+                double temperature = Double.parseDouble(parts[2]);
+                dashboard.updateTelemetry(deviceId, temperature);
+                break;
+            }
+            case "alarm": {
+                double temperature = Double.parseDouble(parts[2]);
+                double threshold = Double.parseDouble(parts[3]);
+                dashboard.updateAlarm(deviceId);
+                System.out.printf("[ALARMA] %s: temperatura %.2f depaseste pragul %.2f%n",
+                        deviceId, temperature, threshold);
+                break;
+            }
+            case "status": {
+                dashboard.updateStatus(deviceId);
+                System.out.println("[STATUS] " + deviceId + ": " + parts[2]);
+                break;
+            }
+            default:
+                System.out.println("[" + kind + "] tip necunoscut");
+        }
     }
 }
